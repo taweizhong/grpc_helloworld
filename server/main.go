@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"google.golang.org/grpc"
+	"google.golang.org/grpc/credentials"
 	pd "grpc_helloworld/server/proto"
 	"log"
 	"net"
@@ -19,8 +20,12 @@ func (s *Server) Say(ctx context.Context, q *pd.HelloReq) (*pd.HelloRep, error) 
 	}, nil
 }
 func main() {
+	// 读取证书
+	file, _ := credentials.NewServerTLSFromFile("./server.pem", "./server.key")
+
 	listen, _ := net.Listen("tcp", ":8080")
-	newServer := grpc.NewServer()
+	// 创建服务并添加证书
+	newServer := grpc.NewServer(grpc.Creds(file))
 	pd.RegisterHelloServerServer(newServer, new(Server))
 	err := newServer.Serve(listen)
 	if err != nil {

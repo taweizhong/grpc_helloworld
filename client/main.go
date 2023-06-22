@@ -4,13 +4,19 @@ import (
 	"context"
 	"fmt"
 	"google.golang.org/grpc"
-	"google.golang.org/grpc/credentials/insecure"
+	"google.golang.org/grpc/credentials"
 	pd "grpc_helloworld/client/proto"
 	"log"
 )
 
 func main() {
-	conn, err := grpc.Dial(":8080", grpc.WithTransportCredentials(insecure.NewCredentials()))
+	// 添加证书
+	file, err2 := credentials.NewClientTLSFromFile("../server/server.pem", "*.test.example.com")
+	if err2 != nil {
+		log.Fatal("证书错误", err2)
+	}
+	conn, err := grpc.Dial(":8080", grpc.WithTransportCredentials(file))
+
 	if err != nil {
 		fmt.Print(err)
 	}
