@@ -10,4 +10,5 @@ message helloRep {
 }
 service HelloServer {
   rpc Say(helloReq) returns (helloRep) {};
+  rpc SayStream(stream helloReq) returns (helloRep) {};
 }

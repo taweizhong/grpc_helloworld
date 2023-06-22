@@ -8,6 +8,7 @@ import (
 	"google.golang.org/grpc/metadata"
 	"google.golang.org/grpc/status"
 	pd "grpc_helloworld/server/proto"
+	"io"
 	"log"
 	"net"
 )
@@ -20,6 +21,21 @@ func (s *Server) Say(ctx context.Context, q *pd.HelloReq) (*pd.HelloRep, error) 
 	return &pd.HelloRep{
 		Say: fmt.Sprintf("%s已经%d岁了", q.Name, q.Age),
 	}, nil
+}
+func (s *Server) SayStream(stream pd.HelloServer_SayStreamServer) error {
+	for {
+		//源源不断的去接收客户端发来的信息
+		recv, err := stream.Recv()
+		if err != nil {
+			if err == io.EOF {
+				break
+			}
+			return err
+		}
+
+		fmt.Println("服务端接收到的流", recv.Name, recv.Age)
+	}
+	return stream.SendAndClose(&pd.HelloRep{Say: "结束"})
 }
 func main() {
 	var authInterceptor grpc.UnaryServerInterceptor
