@@ -6,6 +6,8 @@ import (
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"
 	pd "grpc_helloworld/client/proto"
+	"io"
+	"log"
 )
 
 type Authentication struct {
@@ -35,25 +37,23 @@ func main() {
 	defer conn.Close()
 	client := pd.NewHelloServerClient(conn)
 
-	stream, err := client.SayStream(context.Background())
-	err = stream.Send(&pd.HelloReq{
+	stream, err := client.SayStreamServer(context.Background(), &pd.HelloReq{
 		Name: "111",
-		Age:  3,
+		Age:  0,
 	})
-	if err != nil {
-		fmt.Printf(err.Error())
+	for {
+		recv, err := stream.Recv()
+		if err != nil {
+			if err == io.EOF {
+				fmt.Println("客户端数据接收完成")
+				err := stream.CloseSend()
+				if err != nil {
+					log.Fatal(err)
+				}
+				break
+			}
+			log.Fatal(err)
+		}
+		fmt.Println("客户端收到的流", recv.Say)
 	}
-	stream.Send(&pd.HelloReq{
-		Name: "111",
-		Age:  4,
-	})
-	stream.Send(&pd.HelloReq{
-		Name: "111",
-		Age:  5,
-	})
-	recv, err := stream.CloseAndRecv()
-	if err != nil {
-		return
-	}
-	fmt.Printf("接受：%s", recv.Say)
 }

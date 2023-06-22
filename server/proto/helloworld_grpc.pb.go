@@ -24,6 +24,7 @@ const _ = grpc.SupportPackageIsVersion7
 type HelloServerClient interface {
 	Say(ctx context.Context, in *HelloReq, opts ...grpc.CallOption) (*HelloRep, error)
 	SayStream(ctx context.Context, opts ...grpc.CallOption) (HelloServer_SayStreamClient, error)
+	SayStreamServer(ctx context.Context, in *HelloReq, opts ...grpc.CallOption) (HelloServer_SayStreamServerClient, error)
 }
 
 type helloServerClient struct {
@@ -77,12 +78,45 @@ func (x *helloServerSayStreamClient) CloseAndRecv() (*HelloRep, error) {
 	return m, nil
 }
 
+func (c *helloServerClient) SayStreamServer(ctx context.Context, in *HelloReq, opts ...grpc.CallOption) (HelloServer_SayStreamServerClient, error) {
+	stream, err := c.cc.NewStream(ctx, &HelloServer_ServiceDesc.Streams[1], "/HelloServer/SayStreamServer", opts...)
+	if err != nil {
+		return nil, err
+	}
+	x := &helloServerSayStreamServerClient{stream}
+	if err := x.ClientStream.SendMsg(in); err != nil {
+		return nil, err
+	}
+	if err := x.ClientStream.CloseSend(); err != nil {
+		return nil, err
+	}
+	return x, nil
+}
+
+type HelloServer_SayStreamServerClient interface {
+	Recv() (*HelloRep, error)
+	grpc.ClientStream
+}
+
+type helloServerSayStreamServerClient struct {
+	grpc.ClientStream
+}
+
+func (x *helloServerSayStreamServerClient) Recv() (*HelloRep, error) {
+	m := new(HelloRep)
+	if err := x.ClientStream.RecvMsg(m); err != nil {
+		return nil, err
+	}
+	return m, nil
+}
+
 // HelloServerServer is the server API for HelloServer service.
 // All implementations must embed UnimplementedHelloServerServer
 // for forward compatibility
 type HelloServerServer interface {
 	Say(context.Context, *HelloReq) (*HelloRep, error)
 	SayStream(HelloServer_SayStreamServer) error
+	SayStreamServer(*HelloReq, HelloServer_SayStreamServerServer) error
 	mustEmbedUnimplementedHelloServerServer()
 }
 
@@ -95,6 +129,9 @@ func (UnimplementedHelloServerServer) Say(context.Context, *HelloReq) (*HelloRep
 }
 func (UnimplementedHelloServerServer) SayStream(HelloServer_SayStreamServer) error {
 	return status.Errorf(codes.Unimplemented, "method SayStream not implemented")
+}
+func (UnimplementedHelloServerServer) SayStreamServer(*HelloReq, HelloServer_SayStreamServerServer) error {
+	return status.Errorf(codes.Unimplemented, "method SayStreamServer not implemented")
 }
 func (UnimplementedHelloServerServer) mustEmbedUnimplementedHelloServerServer() {}
 
@@ -153,6 +190,27 @@ func (x *helloServerSayStreamServer) Recv() (*HelloReq, error) {
 	return m, nil
 }
 
+func _HelloServer_SayStreamServer_Handler(srv interface{}, stream grpc.ServerStream) error {
+	m := new(HelloReq)
+	if err := stream.RecvMsg(m); err != nil {
+		return err
+	}
+	return srv.(HelloServerServer).SayStreamServer(m, &helloServerSayStreamServerServer{stream})
+}
+
+type HelloServer_SayStreamServerServer interface {
+	Send(*HelloRep) error
+	grpc.ServerStream
+}
+
+type helloServerSayStreamServerServer struct {
+	grpc.ServerStream
+}
+
+func (x *helloServerSayStreamServerServer) Send(m *HelloRep) error {
+	return x.ServerStream.SendMsg(m)
+}
+
 // HelloServer_ServiceDesc is the grpc.ServiceDesc for HelloServer service.
 // It's only intended for direct use with grpc.RegisterService,
 // and not to be introspected or modified (even as a copy)
@@ -170,6 +228,11 @@ var HelloServer_ServiceDesc = grpc.ServiceDesc{
 			StreamName:    "SayStream",
 			Handler:       _HelloServer_SayStream_Handler,
 			ClientStreams: true,
+		},
+		{
+			StreamName:    "SayStreamServer",
+			Handler:       _HelloServer_SayStreamServer_Handler,
+			ServerStreams: true,
 		},
 	},
 	Metadata: "helloworld.proto",

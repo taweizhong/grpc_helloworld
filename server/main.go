@@ -11,6 +11,7 @@ import (
 	"io"
 	"log"
 	"net"
+	"time"
 )
 
 type Server struct {
@@ -36,6 +37,22 @@ func (s *Server) SayStream(stream pd.HelloServer_SayStreamServer) error {
 		fmt.Println("服务端接收到的流", recv.Name, recv.Age)
 	}
 	return stream.SendAndClose(&pd.HelloRep{Say: "结束"})
+}
+func (s *Server) SayStreamServer(req *pd.HelloReq, stream pd.HelloServer_SayStreamServerServer) error {
+	count := 0
+	fmt.Printf(req.Name, req.Age)
+	for {
+		rsp := &pd.HelloRep{Say: "server send"}
+		err := stream.Send(rsp)
+		if err != nil {
+			return err
+		}
+		time.Sleep(time.Second)
+		count++
+		if count > 10 {
+			return nil
+		}
+	}
 }
 func main() {
 	var authInterceptor grpc.UnaryServerInterceptor
