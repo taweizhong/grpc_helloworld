@@ -2,13 +2,12 @@ package main
 
 import (
 	"context"
-	"crypto/tls"
-	"crypto/x509"
 	"fmt"
 	"google.golang.org/grpc"
-	"google.golang.org/grpc/credentials"
+	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/metadata"
+	"google.golang.org/grpc/status"
 	pd "grpc_helloworld/server/proto"
-	"io/ioutil"
 	"log"
 	"net"
 )
@@ -23,34 +22,49 @@ func (s *Server) Say(ctx context.Context, q *pd.HelloReq) (*pd.HelloRep, error) 
 	}, nil
 }
 func main() {
-	cert, err := tls.LoadX509KeyPair("./server.pem", "./server.key")
-	if err != nil {
-		log.Fatal("证书读取错误", err)
+	var authInterceptor grpc.UnaryServerInterceptor
+	authInterceptor = func(
+		ctx context.Context,
+		req interface{},
+		info *grpc.UnaryServerInfo,
+		handler grpc.UnaryHandler,
+	) (resp interface{}, err error) {
+		//拦截普通方法请求，验证 Token
+		err = Auth(ctx)
+		if err != nil {
+			return
+		}
+		// 继续处理请求
+		return handler(ctx, req)
 	}
-	// 创建一个新的、空的 CertPool
-	certPool := x509.NewCertPool()
-	ca, err := ioutil.ReadFile("../encryption/ca.crt")
-	if err != nil {
-		log.Fatal("ca证书读取错误", err)
-	}
-	// 尝试解析所传入的 PEM 编码的证书。如果解析成功会将其加到 CertPool 中，便于后面的使用
-	certPool.AppendCertsFromPEM(ca)
-	// 构建基于 TLS 的 TransportCredentials 选项
-	creds := credentials.NewTLS(&tls.Config{
-		// 设置证书链，允许包含一个或多个
-		Certificates: []tls.Certificate{cert},
-		// 要求必须校验客户端的证书。可以根据实际情况选用以下参数
-		ClientAuth: tls.RequireAndVerifyClientCert,
-		// 设置根证书的集合，校验方式使用 ClientAuth 中设定的模式
-		ClientCAs: certPool,
-	})
+
 	listen, _ := net.Listen("tcp", ":8080")
 	// 创建服务并添加证书
-	newServer := grpc.NewServer(grpc.Creds(creds))
+	newServer := grpc.NewServer(grpc.UnaryInterceptor(authInterceptor))
 
 	pd.RegisterHelloServerServer(newServer, new(Server))
-	err = newServer.Serve(listen)
+	err := newServer.Serve(listen)
 	if err != nil {
 		log.Print("err:", err)
 	}
+}
+func Auth(ctx context.Context) error {
+	md, ok := metadata.FromIncomingContext(ctx)
+	if !ok {
+		return fmt.Errorf("missing credentials")
+	}
+	var user string
+	var password string
+
+	if val, ok := md["user"]; ok {
+		user = val[0]
+	}
+	if val, ok := md["password"]; ok {
+		password = val[0]
+	}
+
+	if user != "admin" || password != "123456" {
+		return status.Errorf(codes.Unauthenticated, "token不合法")
+	}
+	return nil
 }
