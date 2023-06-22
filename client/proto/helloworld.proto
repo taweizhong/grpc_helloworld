@@ -12,4 +12,5 @@ service HelloServer {
   rpc Say(helloReq) returns (helloRep) {};
   rpc SayStream(stream helloReq) returns (helloRep) {};
   rpc SayStreamServer( helloReq) returns (stream helloRep) {};
+  rpc SayDoubleStream(stream helloReq) returns (stream helloRep) {};
 }

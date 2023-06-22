@@ -54,6 +54,21 @@ func (s *Server) SayStreamServer(req *pd.HelloReq, stream pd.HelloServer_SayStre
 		}
 	}
 }
+func (s *Server) SayDoubleStream(stream pd.HelloServer_SayDoubleStreamServer) error {
+	for {
+		recv, err := stream.Recv()
+		if err != nil {
+			return nil
+		}
+		fmt.Println("服务端收到客户端的消息", recv.Name, recv.Age)
+		time.Sleep(time.Second)
+		rsp := &pd.HelloRep{Say: fmt.Sprintf("%s的年龄：%d", recv.Name, recv.Age)}
+		err = stream.Send(rsp)
+		if err != nil {
+			return nil
+		}
+	}
+}
 func main() {
 	var authInterceptor grpc.UnaryServerInterceptor
 	authInterceptor = func(
